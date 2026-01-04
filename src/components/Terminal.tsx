@@ -28,8 +28,6 @@ function clamp(n: number, min: number, max: number) {
 }
 
 function typingDelayForChar(ch: string) {
-    // Aim for a human-like cadence: generally slower with jitter, plus occasional
-    // micro-pauses on whitespace/punctuation (similar to thinking / finger travel).
     const base = 42 + Math.random() * 56; // ~42–98ms
 
     if (ch === " ") {
@@ -81,7 +79,7 @@ export function Terminal({
     const [rendered, setRendered] = useState<string[]>([]);
     const [active, setActive] = useState<string>("");
     const [done, setDone] = useState(false);
-    const bottomRef = useRef<HTMLDivElement | null>(null);
+    const scrollViewportRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -96,8 +94,6 @@ export function Terminal({
                 if (cancelled) return;
 
                 if (line.kind === "prompt") {
-                    // Group all output lines until the next prompt so we can render them
-                    // immediately, matching modern terminal UX.
                     const outputBatch: string[] = [];
                     for (let j = idx + 1; j < script.length; j++) {
                         const next = script[j];
@@ -116,7 +112,6 @@ export function Terminal({
                         const ch = line.command[i];
                         setActive(`${line.prompt} ${slice}`);
 
-                        // Small chance of a slightly longer hesitation mid-command.
                         if (Math.random() < 0.018) {
                             await sleep(180 + Math.random() * 260);
                         }
@@ -127,7 +122,6 @@ export function Terminal({
                     setRendered((r) => [...r, full]);
                     setActive("");
 
-                    // Brief pause before output, then render the whole batch instantly.
                     if (outputBatch.length > 0) {
                         await sleep(160 + Math.random() * 220);
                         setRendered((r) => [...r, ...outputBatch]);
@@ -138,7 +132,6 @@ export function Terminal({
                     continue;
                 }
 
-                // output
                 setRendered((r) => [...r, line.text]);
                 await sleep(140 + Math.random() * 180);
             }
@@ -154,7 +147,18 @@ export function Terminal({
     }, [script]);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        const el = scrollViewportRef.current;
+        if (!el) return;
+        const prefersReducedMotion =
+            typeof window !== "undefined" &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        requestAnimationFrame(() => {
+            el.scrollTo({
+                top: el.scrollHeight,
+                behavior: prefersReducedMotion ? "auto" : "smooth",
+            });
+        });
     }, [rendered, active]);
 
     return (
@@ -168,7 +172,10 @@ export function Terminal({
                 <div className="ml-2 text-xs font-medium text-slate-500 dark:text-slate-300">{title}</div>
             </div>
 
-            <div className="max-h-[340px] overflow-auto px-4 py-4 font-mono text-[13px] leading-relaxed">
+            <div
+                ref={scrollViewportRef}
+                className="max-h-[340px] overflow-auto px-4 py-4 font-mono text-[13px] leading-relaxed"
+            >
                 {rendered.map((line, idx) => (
                     <div key={idx} className="whitespace-pre-wrap text-slate-800 dark:text-slate-200">
                         <span
@@ -198,8 +205,6 @@ export function Terminal({
                         </span>
                     </div>
                 ) : null}
-
-                <div ref={bottomRef} />
             </div>
         </div>
     );
