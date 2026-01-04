@@ -1,4 +1,3 @@
-import { Badge } from "./components/Badge";
 import { Terminal } from "./components/Terminal";
 import { ThemeToggle } from "./components/ThemeToggle";
 import type { Lang } from "./i18n";
@@ -54,8 +53,24 @@ const STACK = {
         "JavaScript / TypeScript",
         "SQL",
     ],
-    "stack.labels.dbMiddlewares": ["Redis", "PostgreSQL", "MySQL", "RabbitMQ", "MongoDB", "Elasticsearch"],
-    "stack.labels.cloud": ["Docker", "Kubernetes", "KVM", "CI/CD", "Linux", "Prometheus", "Grafana"],
+    "stack.labels.dbMiddlewares": [
+        "Redis",
+        "PostgreSQL",
+        "MySQL",
+        "RabbitMQ",
+        "MongoDB",
+        "Elasticsearch",
+    ],
+    "stack.labels.cloud": [
+        "Docker",
+        "Kubernetes",
+        "KVM",
+        "CI/CD",
+        "Linux",
+        "Prometheus",
+        "Grafana",
+        "Rancher",
+    ],
     "stack.labels.frontendFullstack": ["React", "NextJS", "Vite", "Tailwind CSS"],
 };
 
@@ -119,13 +134,13 @@ function App() {
                 <header className="flex flex-col gap-7">
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
                                 <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
-                                    {PROFILE.name}{" "}
+                                    {PROFILE.name}
                                 </h1>
-                                <Badge tone="accent">{t("roles.backend")}</Badge>
-                                <Badge tone="warn">{t("roles.fullstack")}</Badge>
-                                <Badge tone="neutral">{t("roles.devOps")}</Badge>
+                                <span className="font-mono text-sm text-slate-500 dark:text-slate-400">
+                                    @masteryyh
+                                </span>
                             </div>
 
                             {!scrolled ? (
