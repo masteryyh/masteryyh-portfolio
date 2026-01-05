@@ -49,6 +49,7 @@ function App() {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [certs, setCerts] = useState<Cert[] | null>(null);
     const [techStack, setTechStack] = useState<TechStack | null>(null);
+    const [error, setError] = useState<Error | null>(null);
 
     const aboutItems = t("about.items", { returnObjects: true });
     const aboutList: string[] = Array.isArray(aboutItems)
@@ -61,7 +62,9 @@ function App() {
         const certsUrl = `${baseUrl}assets/certs.json`;
         const techStacksUrl = `${baseUrl}assets/techStacks.json`;
 
-        void (async () => {
+        const abortController = new AbortController();
+
+        async function loadData() {
             try {
                 const [nextProfile, nextCerts, nextTechStack] = await Promise.all([
                     fetchJson<Profile>(infoUrl),
@@ -69,13 +72,24 @@ function App() {
                     fetchJson<TechStack>(techStacksUrl),
                 ]);
 
-                setProfile(nextProfile);
-                setCerts(nextCerts);
-                setTechStack(nextTechStack);
+                if (!abortController.signal.aborted) {
+                    setProfile(nextProfile);
+                    setCerts(nextCerts);
+                    setTechStack(nextTechStack);
+                }
             } catch (e) {
-                console.error(e);
+                if (!abortController.signal.aborted) {
+                    console.error(e);
+                    setError(e instanceof Error ? e : new Error(String(e)));
+                }
             }
-        })();
+        }
+
+        loadData();
+
+        return () => {
+            abortController.abort();
+        };
     }, []);
 
     useEffect(() => {
@@ -113,10 +127,48 @@ function App() {
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
+    if (error) {
+        return (
+            <div className="min-h-dvh relative">
+                <div className="bg-grid" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="mx-4 flex max-w-md flex-col items-center gap-4 text-center">
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                                {t("error.title")}
+                            </h1>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">
+                                {t("error.message")}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => window.location.reload()}
+                            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
+                        >
+                            {t("error.retry")}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!profile || !certs || !techStack) {
         return (
-            <div className="min-h-dvh">
+            <div className="min-h-dvh relative">
                 <div className="bg-grid" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-4" aria-busy="true">
+                        <div
+                            className="h-12 w-12 animate-spin rounded-full border-2 border-slate-400 border-t-transparent dark:border-slate-500 dark:border-t-transparent"
+                            aria-hidden="true"
+                        />
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-300" aria-live="polite">
+                            {t("loading")}
+                        </p>
+                    </div>
+                </div>
             </div>
         );
     }
