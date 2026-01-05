@@ -32,8 +32,8 @@ type Cert = {
 
 type TechStack = Record<string, string[]>;
 
-async function fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+    const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
     if (!res.ok) {
         throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
     }
@@ -51,6 +51,13 @@ function App() {
     const [techStack, setTechStack] = useState<TechStack | null>(null);
     const [error, setError] = useState<Error | null>(null);
 
+    const handleRetry = () => {
+        setError(null);
+        setProfile(null);
+        setCerts(null);
+        setTechStack(null);
+    };
+
     const aboutItems = t("about.items", { returnObjects: true });
     const aboutList: string[] = Array.isArray(aboutItems)
         ? aboutItems.filter((it): it is string => typeof it === "string")
@@ -67,9 +74,9 @@ function App() {
         async function loadData() {
             try {
                 const [nextProfile, nextCerts, nextTechStack] = await Promise.all([
-                    fetchJson<Profile>(infoUrl),
-                    fetchJson<Cert[]>(certsUrl),
-                    fetchJson<TechStack>(techStacksUrl),
+                    fetchJson<Profile>(infoUrl, abortController.signal),
+                    fetchJson<Cert[]>(certsUrl, abortController.signal),
+                    fetchJson<TechStack>(techStacksUrl, abortController.signal),
                 ]);
 
                 if (!abortController.signal.aborted) {
@@ -143,7 +150,7 @@ function App() {
                         </div>
                         <button
                             type="button"
-                            onClick={() => window.location.reload()}
+                            onClick={handleRetry}
                             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200"
                         >
                             {t("error.retry")}
