@@ -1,6 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import { fetchJson } from "./utils/fetchJson";
+import { get } from "./utils/request";
 
 import {
     getInitialLang,
@@ -71,7 +71,7 @@ export async function loadI18nLanguage(lang: Lang): Promise<void> {
     const resourcesBase = `${baseUrl}/assets/i18n`;
 
     const promise = (async () => {
-        const resource = await fetchJson<TranslationResource>(`${resourcesBase}/${lang}.json`);
+        const resource = await get<TranslationResource>(`${resourcesBase}/${lang}.json`);
         i18n.addResourceBundle(lang, "translation", resource, true, true);
         loadedLangs.add(lang);
     })();
