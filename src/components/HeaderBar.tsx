@@ -9,6 +9,7 @@ type HeaderBarProps = {
     activePath: string;
     lang: Lang;
     onLangChange: (lang: Lang) => void;
+    langDisabled?: boolean;
     basePath?: string;
 };
 
@@ -17,6 +18,7 @@ export function HeaderBar({
     activePath,
     lang,
     onLangChange,
+    langDisabled,
     basePath = "~/portfolio",
 }: HeaderBarProps) {
     const lastPathRef = useRef(activePath);
@@ -70,7 +72,7 @@ export function HeaderBar({
 
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
-                    <LanguageToggle value={lang} onChange={onLangChange} />
+                    <LanguageToggle value={lang} onChange={onLangChange} disabled={langDisabled} />
                 </div>
             </div>
         </div>

@@ -9,6 +9,9 @@ import { StackSection } from "./components/StackSection";
 import { CertsSection } from "./components/CertsSection";
 import { LanguageToggle } from "./components/LanguageToggle";
 import { ContactCard } from "./components/ContactCard";
+import { Card } from "./components/Card";
+import { fetchJson } from "./utils/fetchJson";
+import { loadI18nLanguage } from "./i18n";
 
 type Contact = {
     email: string;
@@ -32,13 +35,11 @@ type Cert = {
 
 type TechStack = Record<string, string[]>;
 
-async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, signal });
-    if (!res.ok) {
-        throw new Error(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
-    }
-    return (await res.json()) as T;
-}
+type LoadState<T> = {
+    data: T | null;
+    isLoading: boolean;
+    error: Error | null;
+};
 
 function App() {
     const { t, i18n } = useTranslation();
@@ -46,19 +47,81 @@ function App() {
     const [scrolled, setScrolled] = useState(false);
     const [activePath, setActivePath] = useState<string>("");
 
-    const [profile, setProfile] = useState<Profile | null>(null);
-    const [certs, setCerts] = useState<Cert[] | null>(null);
-    const [techStack, setTechStack] = useState<TechStack | null>(null);
-    const [error, setError] = useState<Error | null>(null);
+    const [profileState, setProfileState] = useState<LoadState<Profile>>({
+        data: null,
+        isLoading: true,
+        error: null,
+    });
+    const [certsState, setCertsState] = useState<LoadState<Cert[]>>({
+        data: null,
+        isLoading: true,
+        error: null,
+    });
+    const [techStackState, setTechStackState] = useState<LoadState<TechStack>>({
+        data: null,
+        isLoading: true,
+        error: null,
+    });
+
+    const [i18nError, setI18nError] = useState<Error | null>(null);
+    const [i18nReady, setI18nReady] = useState(false);
+    const [languageSwitching, setLanguageSwitching] = useState(false);
     const [retryCount, setRetryCount] = useState(0);
 
     const handleRetry = useCallback(() => {
-        setError(null);
-        setProfile(null);
-        setCerts(null);
-        setTechStack(null);
+        setI18nError(null);
+        setI18nReady(false);
+        setLanguageSwitching(false);
+        setProfileState({ data: null, isLoading: true, error: null });
+        setCertsState({ data: null, isLoading: true, error: null });
+        setTechStackState({ data: null, isLoading: true, error: null });
         setRetryCount((prev) => prev + 1);
     }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        void (async () => {
+            try {
+                await loadI18nLanguage(i18n.language as Lang);
+                if (!cancelled) {
+                    setI18nReady(true);
+                }
+            } catch (e) {
+                if (!cancelled) {
+                    console.error(e);
+                    setI18nError(e instanceof Error ? e : new Error(String(e)));
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [retryCount, i18n.language]);
+
+    const handleLangChange = useCallback(
+        async (next: Lang) => {
+            if (next === lang) return;
+            if (languageSwitching) return;
+
+            try {
+                setLanguageSwitching(true);
+                await loadI18nLanguage(next);
+                await i18n.changeLanguage(next);
+
+                await new Promise<void>((resolve) => {
+                    requestAnimationFrame(() => resolve());
+                });
+            } catch (e) {
+                console.error(e);
+                setI18nError(e instanceof Error ? e : new Error(String(e)));
+            } finally {
+                setLanguageSwitching(false);
+            }
+        },
+        [i18n, languageSwitching, lang],
+    );
 
     const aboutItems = t("about.items", { returnObjects: true });
     const aboutList: string[] = Array.isArray(aboutItems)
@@ -66,35 +129,58 @@ function App() {
         : [];
 
     useEffect(() => {
-        const baseUrl = import.meta.env.BASE_URL;
-        const infoUrl = `${baseUrl}assets/info.json`;
-        const certsUrl = `${baseUrl}assets/certs.json`;
-        const techStacksUrl = `${baseUrl}assets/techStacks.json`;
+        const baseUrl = import.meta.env.BASE_URL.replace(/\/+$/, "");
+        const infoUrl = `${baseUrl}/assets/info.json`;
+        const certsUrl = `${baseUrl}/assets/certs.json`;
+        const techStacksUrl = `${baseUrl}/assets/techStacks.json`;
 
         const abortController = new AbortController();
 
-        async function loadData() {
-            try {
-                const [nextProfile, nextCerts, nextTechStack] = await Promise.all([
-                    fetchJson<Profile>(infoUrl, abortController.signal),
-                    fetchJson<Cert[]>(certsUrl, abortController.signal),
-                    fetchJson<TechStack>(techStacksUrl, abortController.signal),
-                ]);
+        void (async () => {
+            const [profileRes, certsRes, techStackRes] = await Promise.allSettled([
+                fetchJson<Profile>(infoUrl, { signal: abortController.signal }),
+                fetchJson<Cert[]>(certsUrl, { signal: abortController.signal }),
+                fetchJson<TechStack>(techStacksUrl, { signal: abortController.signal }),
+            ]);
 
-                if (!abortController.signal.aborted) {
-                    setProfile(nextProfile);
-                    setCerts(nextCerts);
-                    setTechStack(nextTechStack);
-                }
-            } catch (e) {
-                if (!abortController.signal.aborted) {
-                    console.error(e);
-                    setError(e instanceof Error ? e : new Error(String(e)));
-                }
+            if (abortController.signal.aborted) return;
+
+            if (profileRes.status === "fulfilled") {
+                setProfileState({ data: profileRes.value, isLoading: false, error: null });
+            } else {
+                console.error(profileRes.reason);
+                setProfileState({
+                    data: null,
+                    isLoading: false,
+                    error: profileRes.reason instanceof Error ? profileRes.reason : new Error(String(profileRes.reason)),
+                });
             }
-        }
 
-        loadData();
+            if (certsRes.status === "fulfilled") {
+                setCertsState({ data: certsRes.value, isLoading: false, error: null });
+            } else {
+                console.error(certsRes.reason);
+                setCertsState({
+                    data: null,
+                    isLoading: false,
+                    error: certsRes.reason instanceof Error ? certsRes.reason : new Error(String(certsRes.reason)),
+                });
+            }
+
+            if (techStackRes.status === "fulfilled") {
+                setTechStackState({ data: techStackRes.value, isLoading: false, error: null });
+            } else {
+                console.error(techStackRes.reason);
+                setTechStackState({
+                    data: null,
+                    isLoading: false,
+                    error:
+                        techStackRes.reason instanceof Error
+                            ? techStackRes.reason
+                            : new Error(String(techStackRes.reason)),
+                });
+            }
+        })();
 
         return () => {
             abortController.abort();
@@ -102,9 +188,9 @@ function App() {
     }, [retryCount]);
 
     useEffect(() => {
-        if (!profile) return;
-        document.title = t("meta.title", { name: profile.name });
-    }, [lang, profile, t]);
+        const name = profileState.data?.name;
+        document.title = t("meta.title", { name });
+    }, [lang, profileState.data?.name, t]);
 
     useEffect(() => {
         function onScroll() {
@@ -136,7 +222,7 @@ function App() {
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
-    if (error) {
+    if (i18nError || profileState.error) {
         return (
             <div className="min-h-dvh relative">
                 <div className="bg-grid" />
@@ -163,7 +249,7 @@ function App() {
         );
     }
 
-    if (!profile || !certs || !techStack) {
+    if (!i18nReady) {
         return (
             <div className="min-h-dvh relative" aria-busy="true">
                 <div className="bg-grid" />
@@ -182,6 +268,10 @@ function App() {
         );
     }
 
+    const profile = profileState.data;
+    const certs = certsState.data;
+    const techStack = techStackState.data;
+
     return (
         <div className="min-h-dvh">
             <div className="bg-grid" />
@@ -190,7 +280,8 @@ function App() {
                 scrolled={scrolled}
                 activePath={activePath}
                 lang={lang}
-                onLangChange={(l) => i18n.changeLanguage(l)}
+                onLangChange={handleLangChange}
+                langDisabled={languageSwitching}
             />
 
             <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-5 sm:py-12">
@@ -199,7 +290,14 @@ function App() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
                                 <h1 className="break-words text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 sm:text-3xl">
-                                    {profile.name}
+                                    {profile ? (
+                                        profile.name
+                                    ) : (
+                                        <span
+                                            className="inline-block h-7 w-48 animate-pulse rounded bg-slate-200 align-middle dark:bg-slate-800 sm:h-8"
+                                            aria-hidden="true"
+                                        />
+                                    )}
                                 </h1>
                                 <span className="font-mono text-sm text-slate-500 dark:text-slate-400">
                                     @masteryyh
@@ -209,7 +307,7 @@ function App() {
                             {!scrolled ? (
                                 <div className="hidden items-center gap-2 sm:flex">
                                     <ThemeToggle />
-                                    <LanguageToggle value={lang} onChange={(l) => i18n.changeLanguage(l)} />
+                                    <LanguageToggle value={lang} onChange={handleLangChange} disabled={languageSwitching} />
                                 </div>
                             ) : null}
                         </div>
@@ -220,14 +318,56 @@ function App() {
                     </div>
 
                     <div className="grid gap-5 sm:gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-                        <Terminal
-                            title="~/portfolio"
-                            name={profile.name}
-                            line2={t("terminal.line2")}
-                            contact={profile.contact}
-                        />
+                        {profileState.error ? (
+                            <Card>
+                                <div className="text-sm text-slate-600 dark:text-slate-300">{t("error.message")}</div>
+                            </Card>
+                        ) : profile ? (
+                            <Terminal
+                                title="~/portfolio"
+                                name={profile.name}
+                                line2={t("terminal.line2")}
+                                contact={profile.contact}
+                            />
+                        ) : (
+                            <Card aria-busy="true">
+                                <div className="animate-pulse" aria-label="Loading terminal">
+                                    <div className="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800" />
+                                    <div className="mt-3 h-3 w-52 rounded bg-slate-200 dark:bg-slate-800" />
+                                    <div className="mt-3 h-3 w-48 rounded bg-slate-200 dark:bg-slate-800" />
+                                    <div className="mt-6 space-y-2">
+                                        {Array.from({ length: 6 }).map((_, idx) => (
+                                            <div key={idx} className="h-3 w-full rounded bg-slate-200 dark:bg-slate-800" />
+                                        ))}
+                                    </div>
+                                </div>
+                            </Card>
+                        )}
 
-                        <ContactCard contact={profile.contact} />
+                        {profileState.error ? (
+                            <Card>
+                                <div className="text-sm text-slate-600 dark:text-slate-300">{t("error.message")}</div>
+                            </Card>
+                        ) : profile ? (
+                            <ContactCard contact={profile.contact} />
+                        ) : (
+                            <Card aria-busy="true">
+                                <div className="animate-pulse" aria-label="Loading contact information">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800" />
+                                        <div className="h-5 w-12 rounded-full bg-slate-200 dark:bg-slate-800" />
+                                    </div>
+                                    <div className="mt-5 grid gap-3">
+                                        {Array.from({ length: 5 }).map((_, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="h-[52px] rounded-xl border border-slate-200 bg-white/60 dark:border-slate-800/70 dark:bg-slate-950/40"
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </Card>
+                        )}
                     </div>
                 </header>
 
@@ -236,22 +376,34 @@ function App() {
 
                     <StackSection
                         title={t("stack.title")}
-                        groups={Object.entries(techStack).map(([group, items]) => ({
-                            title: t(group),
-                            items,
-                        }))}
+                        isLoading={techStackState.isLoading}
+                        errorMessage={techStackState.error ? t("error.message") : undefined}
+                        groups={
+                            techStack
+                                ? Object.entries(techStack).map(([group, items]) => ({
+                                      title: t(group),
+                                      items,
+                                  }))
+                                : []
+                        }
                     />
 
                     <CertsSection
                         title={t("cert.title")}
                         validLabel={t("cert.valid")}
                         viewLabel={t("cert.viewOnCredly")}
-                        certs={certs.map((c) => ({
-                            name: c.name,
-                            issuer: `${t(c.issuer)}`,
-                            year: c.year,
-                            href: c.href,
-                        }))}
+                        isLoading={certsState.isLoading}
+                        errorMessage={certsState.error ? t("error.message") : undefined}
+                        certs={
+                            certs
+                                ? certs.map((c) => ({
+                                      name: c.name,
+                                      issuer: `${t(c.issuer)}`,
+                                      year: c.year,
+                                      href: c.href,
+                                  }))
+                                : []
+                        }
                     />
                 </main>
 

@@ -59,7 +59,7 @@ export function Terminal({
             { kind: "prompt", prompt: "yyh@dev:~$", command: "whoami" },
             { kind: "output", text: name },
             { kind: "output", text: line2 },
-            { kind: "prompt", prompt: "yyh@dev:~$", command: "cat info.json | jq" },
+            { kind: "prompt", prompt: "yyh@dev:~$", command: "cat assets/info.json | jq" },
             { kind: "output", text: "{" },
             { kind: "output", text: `  "email": "${contact.email}",` },
             { kind: "output", text: `  "phone": "${contact.phone ?? "N/A"}",` },
