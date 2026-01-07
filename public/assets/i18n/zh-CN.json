@@ -1,0 +1,67 @@
+{
+    "meta": {
+        "title": "masteryyh's home"
+    },
+    "roles": {
+        "backend": "后端开发",
+        "fullstack": "全栈开发",
+        "devOps": "DevOps"
+    },
+    "header": {
+        "tagline": "后端 / 全栈 / DevOps 工程师"
+    },
+    "actions": {
+        "open": "打开"
+    },
+    "contact": {
+        "title": "联系方式",
+        "email": "邮箱",
+        "phone": "手机号",
+        "wechat": "微信",
+        "github": "GitHub",
+        "linkedin": "LinkedIn",
+        "credly": "Credly"
+    },
+    "about": {
+        "title": "关于我",
+        "items": [
+            "后端 / 全栈工程师：Go、Java、Node.js、React...",
+            "DevOps 工程师：CI/CD、Kubernetes、IaC、自动化和可观测性",
+            "Homelab 爱好者，正在家自建数据中心",
+            "一只孟加拉豹猫🐱的朋友和家人"
+        ]
+    },
+    "cert": {
+        "title": "证书",
+        "valid": "有效",
+        "linuxFoundation": "Linux 基金会",
+        "viewOnCredly": "在 Credly 查看"
+    },
+    "stack": {
+        "title": "技术栈",
+        "labels": {
+            "languagesFrameworks": "语言 / 框架",
+            "dbMiddlewares": "数据库 / 中间件",
+            "cloud": "云原生 / 运维",
+            "frontendFullstack": "前端 / 全栈"
+        }
+    },
+    "footer": {
+        "builtWith": "使用 Vite + React 构建 ❤️"
+    },
+    "terminal": {
+        "line2": "后端 / 全栈 / DevOps"
+    },
+    "colorMode": {
+        "ariaLabel": "主题：{{mode}}。点击切换。",
+        "system": "系统",
+        "light": "浅色",
+        "dark": "深色"
+    },
+    "loading": "加载中...",
+    "error": {
+        "title": "发生甚么事了?",
+        "message": "无法加载页面数据。请刷新页面重试。",
+        "retry": "重试"
+    }
+}
