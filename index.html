@@ -10,6 +10,25 @@
         />
         <meta name="theme-color" content="#020617" />
         <script>
+            (function() {
+                const query = window.location.search;
+
+                const queryParams = new URLSearchParams(query);
+                const p = queryParams.get('p');
+                if (!p) {
+                    return;
+                }
+
+                queryParams.delete('p');
+
+                const remainingQuery = queryParams.toString();
+                const newUrl = decodeURIComponent(p) +
+                    (remainingQuery ? '?' + remainingQuery : '') +
+                    window.location.hash;
+                window.history.replaceState(null, null, newUrl);
+            })();
+        </script>
+        <script>
             ;(() => {
                 const key = "theme";
                 const stored = localStorage.getItem(key);
