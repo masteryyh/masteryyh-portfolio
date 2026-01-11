@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting...</title>
+    <script>
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const p = params.get('p');
+            if (!p) {
+                return;
+            }
+
+            const redirect = sessionStorage.redirect;
+            if (redirect && redirect !== location.href) {
+                sessionStorage.removeItem('redirect');
+                history.replaceState(null, null, redirect);
+                return;
+            }
+
+            const path = location.pathname;
+            if (path && path !== '/') {
+                sessionStorage.setItem('redirect', location.href);
+                location.replace(
+                    location.origin +
+                    '/?p=' +
+                    encodeURIComponent(path) +
+                    (location.search ? '&' + location.search.slice(1) : '') +
+                    location.hash
+                );
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <noscript>
+        <p>This site requires JavaScript to be enabled.</p>
+    </noscript>
+</body>
+
+</html>
