@@ -4,6 +4,7 @@ description: This is my first blog post. Learn about what I'll be sharing here.
 date: 2026-01-11
 tags: [announcement, personal]
 highlight: true
+published: false
 ---
 
 # Welcome to My Blog! 🎉
