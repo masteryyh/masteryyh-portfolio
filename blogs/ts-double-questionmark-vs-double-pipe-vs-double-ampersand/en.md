@@ -1,5 +1,5 @@
 ---
-title: The ?? , || and && Operators in JS/TS
+title: The ??, || and && Operators in JS/TS
 description: For JS/TS developers, understanding the differences between the nullish coalescing operator (??), logical OR (||), and logical AND (&&) is crucial.
 date: 2026-01-18
 tags: [TypeScript, JavaScript]
