@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BlogPost } from "./types";
 import { loadAllBlogPosts } from "./loader";
@@ -7,24 +7,25 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { Link, useLocation } from "react-router-dom";
 import type { Lang } from "../i18n";
-import { loadI18nLanguage } from "../i18n";
 import { HeaderBar } from "../components/HeaderBar";
 import { SocialButtons } from "../components/SocialButtons";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GitHubAvatarButton } from "../components/GitHubAvatarButton";
 import { PROFILE } from "../consts/consts";
+import { useI18nLoader } from "../hooks/useI18nLoader";
+import { useLanguageSwitcher } from "../hooks/useLanguageSwitcher";
+import { useScrollState } from "../hooks/useScrollState";
+import { BlogCardSkeleton } from "../components/Skeleton";
 
 export function BlogListPage() {
     const { t, i18n } = useTranslation();
     const location = useLocation();
     const lang: Lang = i18n.resolvedLanguage === "zh-CN" ? "zh-CN" : "en";
-    const [scrolled, setScrolled] = useState(false);
 
-    const [i18nError, setI18nError] = useState<Error | null>(null);
-    const [i18nReady, setI18nReady] = useState(false);
-    const [languageSwitching, setLanguageSwitching] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
+    const { i18nError, i18nReady, handleRetry } = useI18nLoader(i18n.language);
+    const { languageSwitching, handleLangChange } = useLanguageSwitcher(i18n, lang);
+    const scrolled = useScrollState(8);
 
     const activePath = useMemo(() => {
         const baseUrl = import.meta.env.BASE_URL.replace(/\/+$/, "");
@@ -35,68 +36,6 @@ export function BlogListPage() {
     const [posts, setPosts] = useState<BlogPost[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
-
-    const handleRetry = useCallback(() => {
-        setI18nError(null);
-        setI18nReady(false);
-        setLanguageSwitching(false);
-        setRetryCount((prev) => prev + 1);
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        void (async () => {
-            try {
-                await loadI18nLanguage(i18n.language as Lang);
-                if (!cancelled) {
-                    setI18nReady(true);
-                }
-            } catch (e) {
-                if (!cancelled) {
-                    console.error(e);
-                    setI18nError(e instanceof Error ? e : new Error(String(e)));
-                }
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [retryCount, i18n.language]);
-
-    const handleLangChange = useCallback(
-        async (next: Lang) => {
-            if (next === lang) return;
-            if (languageSwitching) return;
-
-            try {
-                setLanguageSwitching(true);
-                await loadI18nLanguage(next);
-                await i18n.changeLanguage(next);
-
-                await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => resolve());
-                });
-            } catch (e) {
-                console.error(e);
-                setI18nError(e instanceof Error ? e : new Error(String(e)));
-            } finally {
-                setLanguageSwitching(false);
-            }
-        },
-        [i18n, lang, languageSwitching],
-    );
-
-    useEffect(() => {
-        function onScroll() {
-            setScrolled(window.scrollY > 8);
-        }
-
-        onScroll();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
-    }, []);
 
     useEffect(() => {
         if (!i18nReady) return;
@@ -149,19 +88,34 @@ export function BlogListPage() {
 
     if (!i18nReady) {
         return (
-            <div className="min-h-dvh relative" aria-busy="true">
+            <div className="min-h-dvh">
                 <div className="bg-grid" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-4" role="status">
-                        <div
-                            className="h-12 w-12 animate-spin rounded-full border-2 border-slate-400 border-t-transparent dark:border-slate-500 dark:border-t-transparent"
-                            aria-hidden="true"
-                        />
-                        <p className="text-sm font-medium text-slate-600 dark:text-slate-300" aria-live="polite">
-                            {t("loading")}
-                        </p>
+
+                <HeaderBar
+                    scrolled={scrolled}
+                    activePath={activePath}
+                    lang={lang}
+                    onLangChange={handleLangChange}
+                    langDisabled={languageSwitching}
+                    linkedInUrl={PROFILE.contact.linkedin}
+                />
+
+                <main className="relative mx-auto w-full max-w-4xl px-4 py-10 sm:px-5">
+                    <div className="mb-8">
+                        <div className="h-5 w-32 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
                     </div>
-                </div>
+
+                    <header className="mb-10 space-y-3">
+                        <div className="h-10 w-48 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                        <div className="h-5 w-96 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
+                    </header>
+
+                    <div className="grid gap-6">
+                        {[...Array(3)].map((_, i) => (
+                            <BlogCardSkeleton key={i} />
+                        ))}
+                    </div>
+                </main>
             </div>
         );
     }

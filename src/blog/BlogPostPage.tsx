@@ -1,36 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, Navigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import type { BlogPost } from "./types";
 import { loadBlogPost } from "./loader";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-    faArrowLeft,
-    faCalendar,
-    faClock,
-    faTag,
-} from "@fortawesome/free-solid-svg-icons";
+import { faArrowLeft, faCalendar, faClock, faTag } from "@fortawesome/free-solid-svg-icons";
 import type { Lang } from "../i18n";
-import { loadI18nLanguage } from "../i18n";
 import { HeaderBar } from "../components/HeaderBar";
 import { SocialButtons } from "../components/SocialButtons";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { GitHubAvatarButton } from "../components/GitHubAvatarButton";
 import { PROFILE } from "../consts/consts";
+import { useI18nLoader } from "../hooks/useI18nLoader";
+import { useLanguageSwitcher } from "../hooks/useLanguageSwitcher";
+import { useScrollState } from "../hooks/useScrollState";
+import { SEO } from "../components/SEO";
 
 export function BlogPostPage() {
     const { id } = useParams<{ id: string }>();
     const { t, i18n } = useTranslation();
     const location = useLocation();
     const lang: Lang = i18n.resolvedLanguage === "zh-CN" ? "zh-CN" : "en";
-    const [scrolled, setScrolled] = useState(false);
 
-    const [i18nError, setI18nError] = useState<Error | null>(null);
-    const [i18nReady, setI18nReady] = useState(false);
-    const [languageSwitching, setLanguageSwitching] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
+    // Use custom hooks to reduce code duplication
+    const { i18nError, i18nReady, handleRetry } = useI18nLoader(i18n.language);
+    const { languageSwitching, handleLangChange } = useLanguageSwitcher(i18n, lang);
+    const scrolled = useScrollState(8);
 
     const activePath = useMemo(() => {
         const baseUrl = import.meta.env.BASE_URL.replace(/\/+$/, "");
@@ -41,68 +38,6 @@ export function BlogPostPage() {
     const [post, setPost] = useState<BlogPost | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
-
-    const handleRetry = useCallback(() => {
-        setI18nError(null);
-        setI18nReady(false);
-        setLanguageSwitching(false);
-        setRetryCount((prev) => prev + 1);
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        void (async () => {
-            try {
-                await loadI18nLanguage(i18n.language as Lang);
-                if (!cancelled) {
-                    setI18nReady(true);
-                }
-            } catch (e) {
-                if (!cancelled) {
-                    console.error(e);
-                    setI18nError(e instanceof Error ? e : new Error(String(e)));
-                }
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [retryCount, i18n.language]);
-
-    const handleLangChange = useCallback(
-        async (next: Lang) => {
-            if (next === lang) return;
-            if (languageSwitching) return;
-
-            try {
-                setLanguageSwitching(true);
-                await loadI18nLanguage(next);
-                await i18n.changeLanguage(next);
-
-                await new Promise<void>((resolve) => {
-                    requestAnimationFrame(() => resolve());
-                });
-            } catch (e) {
-                console.error(e);
-                setI18nError(e instanceof Error ? e : new Error(String(e)));
-            } finally {
-                setLanguageSwitching(false);
-            }
-        },
-        [i18n, lang, languageSwitching],
-    );
-
-    useEffect(() => {
-        function onScroll() {
-            setScrolled(window.scrollY > 8);
-        }
-
-        onScroll();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        return () => window.removeEventListener("scroll", onScroll);
-    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -146,9 +81,7 @@ export function BlogPostPage() {
                             <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
                                 {t("error.title")}
                             </h1>
-                            <p className="text-sm text-slate-600 dark:text-slate-300">
-                                {t("error.message")}
-                            </p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">{t("error.message")}</p>
                         </div>
                         <button
                             type="button"
@@ -184,6 +117,18 @@ export function BlogPostPage() {
 
     return (
         <div className="min-h-dvh">
+            {post ? (
+                <SEO
+                    title={`${post.title} • masteryyh's home`}
+                    description={post.description}
+                    image={post.cover}
+                    type="article"
+                    author={PROFILE.name}
+                    publishedTime={post.date}
+                    tags={post.tags}
+                />
+            ) : null}
+
             <div className="bg-grid" />
 
             <HeaderBar
@@ -308,7 +253,8 @@ export function BlogPostPage() {
                 <footer className="mt-12 border-t border-slate-200 py-6 text-xs text-slate-600 dark:border-slate-800/70 dark:text-slate-400 sm:py-8 sm:text-sm">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                            <span className="text-slate-900 dark:text-slate-300">masteryyh</span> • {t("footer.builtWith")}
+                            <span className="text-slate-900 dark:text-slate-300">masteryyh</span> •{" "}
+                            {t("footer.builtWith")}
                         </div>
                     </div>
                 </footer>
